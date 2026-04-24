@@ -219,9 +219,11 @@
           Apoi: <iframe id="unity-iframe" src="http://localhost:8080"></iframe>
         -->
         <!-- <iframe id="unity-iframe" src="http://localhost:8080" allow="autoplay"></iframe> -->
+         <!-- <iframe id="unity-iframe" src="http://172.16.55.78:9000" allow="autoplay"></iframe> -->
+         <iframe id="unity-iframe" src="http://172.20.10.12:9000" allow="autoplay" scrolling="no" style="overflow:hidden"></iframe>
 
         <!-- PLACEHOLDER — sterge asta cand ai build-ul Unity gata -->
-        <div class="unity-placeholder" id="unity-placeholder">
+        <!-- <div class="unity-placeholder" id="unity-placeholder">
           <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
             <polygon points="50,5 95,75 5,75" stroke="#4b5563" stroke-width="4" fill="none"/>
             <circle cx="50" cy="50" r="15" stroke="#4b5563" stroke-width="4" fill="none"/>
@@ -232,7 +234,7 @@
             2. Ruleaza: <code>python -m http.server 8080</code><br>
             3. Decommenteaza iframe-ul din HTML
           </p>
-        </div>
+        </div> -->
         <div class="mode-label" id="mode-label-3d">🟢 LIVE</div>
       </div>
     </div>
@@ -298,7 +300,7 @@
         </div>
 
         <div class="whatif-btns">
-          <button class="btn btn-green"   onclick="sendWhatIfToESP()">▶ Trimite la ESP32</button>
+          <button class="btn btn-green hidden"   onclick="sendWhatIfToESP()">▶ Aplica setari</button>
           <button class="btn btn-gray"    onclick="resetWhatIf()">↺ Reset</button>
         </div>
         <div id="whatif-status" style="margin-top:10px;font-size:.78rem;color:#6b7280;"></div>
@@ -394,20 +396,84 @@ const firestore = firebase.firestore();
 let currentMode = 'live';
 let liveUnsubscribe = null;
 
+let whatifInterval = null;
+
+function sendWhatIfContinuous() {
+  const temp = parseFloat(document.getElementById('wi-temp').value);
+  const hum  = parseFloat(document.getElementById('wi-hum').value);
+  const gas  = parseInt(document.getElementById('wi-gas').value);
+  const vib  = parseFloat(document.getElementById('wi-vib').value);
+
+  db.ref('/serverroom/live').set({
+    temp, humidity: hum, gas_raw: gas, vibration: vib,
+    timestamp: Date.now()
+  });
+
+  // updateWhatIf();
+}
+
+// function setMode(mode) {
+//   if(currentMode === 'whatif' && mode !== 'whatif')
+//   {
+//     if(whatifInterval)
+//     {
+//         clearInterval(whatifInterval);
+//         whatifInterval = null;
+//     }
+//     db.ref('/serverroom/whatif').set({ active: false});
+//   }
+
+//   currentMode = mode;
+
+//   if(mode === 'whatif')
+//   {
+//     updateWhatIf();
+//     setTimeout(() => {
+//         whatifInterval = setInterval(sendWhatIfContinuous, 2000);
+//     }, 100);
+//   }
+
+//   // Tabs
+//   ['live','whatif','history'].forEach(m => {
+//     document.getElementById('tab-' + m).classList.toggle('active', m === mode);
+//   });
+
+//   // Panels
+//   document.getElementById('whatif-section').classList.toggle('hidden', mode !== 'whatif');
+//   document.getElementById('history-section').classList.toggle('hidden', mode !== 'history');
+//   document.getElementById('alerts-section').classList.toggle('hidden', mode === 'history');
+
+//   // Mode label Unity
+//   const labels = { live:'🟢 LIVE', whatif:'🔬 WHAT IF', history:'⏪ ISTORIC' };
+//   document.getElementById('unity-mode-label').textContent = 'MOD: ' + mode.toUpperCase();
+//   document.getElementById('mode-label-3d').textContent = labels[mode];
+
+//   if (mode === 'live') {
+//     startLiveListener();
+//   } else {
+//     stopLiveListener();
+//     if (mode === 'whatif') updateWhatIf();
+//     if (mode === 'history') stopResimulation();
+//   }
+// }
+
 function setMode(mode) {
+  if(whatifInterval)
+  {
+    clearInterval(whatifInterval);
+    whatifInterval = null;
+  }
+
   currentMode = mode;
 
-  // Tabs
   ['live','whatif','history'].forEach(m => {
     document.getElementById('tab-' + m).classList.toggle('active', m === mode);
   });
 
-  // Panels
   document.getElementById('whatif-section').classList.toggle('hidden', mode !== 'whatif');
   document.getElementById('history-section').classList.toggle('hidden', mode !== 'history');
   document.getElementById('alerts-section').classList.toggle('hidden', mode === 'history');
 
-  // Mode label Unity
   const labels = { live:'🟢 LIVE', whatif:'🔬 WHAT IF', history:'⏪ ISTORIC' };
   document.getElementById('unity-mode-label').textContent = 'MOD: ' + mode.toUpperCase();
   document.getElementById('mode-label-3d').textContent = labels[mode];
@@ -416,7 +482,10 @@ function setMode(mode) {
     startLiveListener();
   } else {
     stopLiveListener();
-    if (mode === 'whatif') updateWhatIf();
+    if (mode === 'whatif') {
+      updateWhatIf();
+      whatifInterval = setInterval(sendWhatIfContinuous, 500);
+    }
     if (mode === 'history') stopResimulation();
   }
 }
@@ -424,39 +493,99 @@ function setMode(mode) {
 // ============================================================
 //  CHARTS
 // ============================================================
+// const MAX_PTS = 30;
+// const chartLabels = [];
+// const chartData = { temp:[], hum:[], gas:[], vib:[] };
+
+// function makeChart(id, label, color, key) {
+//   return new Chart(document.getElementById(id), {
+//     type: 'line',
+//     data: {
+//       labels: chartLabels,
+//       datasets: [{
+//         label, data: chartData[key],
+//         borderColor: color, backgroundColor: color + '22',
+//         borderWidth: 2, pointRadius: 2, tension: 0.3, fill: true
+//       }]
+//     },
+//     options: {
+//       responsive: true, animation: false,
+//       plugins: { legend: { display: false } },
+//       scales: {
+//         x: { ticks:{ color:'#4b5563', maxTicksLimit:5 }, grid:{ color:'#1e2d5a' } },
+//         y: { ticks:{ color:'#4b5563' },                  grid:{ color:'#1e2d5a' } }
+//       }
+//     }
+//   });
+// }
+// const charts = {
+//   temp: makeChart('chartTemp','Temp','#60a5fa','temp'),
+//   hum:  makeChart('chartHum', 'Hum', '#34d399','hum'),
+//   gas:  makeChart('chartGas', 'Gas', '#f59e0b','gas'),
+//   vib:  makeChart('chartVib', 'Vib', '#a78bfa','vib'),
+// };
+
+// function pushChart(temp, hum, gas, vib) {
+//   const t = new Date().toLocaleTimeString('ro-RO');
+//   if (chartLabels.length >= MAX_PTS) {
+//     chartLabels.shift();
+//     Object.values(chartData).forEach(a => a.shift());
+//   }
+//   chartLabels.push(t);
+//   chartData.temp.push(temp); chartData.hum.push(hum);
+//   chartData.gas.push(gas);   chartData.vib.push(vib);
+//   Object.values(charts).forEach(c => c.update());
+// }
+
+// ============================================================
+//  CHARTS — lazy init după Unity
+// ============================================================
 const MAX_PTS = 30;
 const chartLabels = [];
 const chartData = { temp:[], hum:[], gas:[], vib:[] };
+let charts = {};
+let chartsReady = false;
 
-function makeChart(id, label, color, key) {
-  return new Chart(document.getElementById(id), {
-    type: 'line',
-    data: {
-      labels: chartLabels,
-      datasets: [{
-        label, data: chartData[key],
-        borderColor: color, backgroundColor: color + '22',
-        borderWidth: 2, pointRadius: 2, tension: 0.3, fill: true
-      }]
-    },
-    options: {
-      responsive: true, animation: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks:{ color:'#4b5563', maxTicksLimit:5 }, grid:{ color:'#1e2d5a' } },
-        y: { ticks:{ color:'#4b5563' },                  grid:{ color:'#1e2d5a' } }
+function initCharts() {
+  if (chartsReady) return;
+  chartsReady = true;
+
+  function makeChart(id, label, color, key) {
+    const canvas = document.getElementById(id);
+    // Forțează un nou context 2D, clar
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
+    return new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels: chartLabels,
+        datasets: [{
+          label, data: chartData[key],
+          borderColor: color, backgroundColor: color + '22',
+          borderWidth: 2, pointRadius: 2, tension: 0.3, fill: true
+        }]
+      },
+      options: {
+        responsive: true, animation: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks:{ color:'#4b5563', maxTicksLimit:5 }, grid:{ color:'#1e2d5a' } },
+          y: { ticks:{ color:'#4b5563' },                  grid:{ color:'#1e2d5a' } }
+        }
       }
-    }
-  });
+    });
+  }
+
+  charts = {
+    temp: makeChart('chartTemp','Temp','#60a5fa','temp'),
+    hum:  makeChart('chartHum', 'Hum', '#34d399','hum'),
+    gas:  makeChart('chartGas', 'Gas', '#f59e0b','gas'),
+    vib:  makeChart('chartVib', 'Vib', '#a78bfa','vib'),
+  };
 }
-const charts = {
-  temp: makeChart('chartTemp','Temp','#60a5fa','temp'),
-  hum:  makeChart('chartHum', 'Hum', '#34d399','hum'),
-  gas:  makeChart('chartGas', 'Gas', '#f59e0b','gas'),
-  vib:  makeChart('chartVib', 'Vib', '#a78bfa','vib'),
-};
 
 function pushChart(temp, hum, gas, vib) {
+  if (!chartsReady) initCharts(); // init lazy dacă nu s-a făcut încă
   const t = new Date().toLocaleTimeString('ro-RO');
   if (chartLabels.length >= MAX_PTS) {
     chartLabels.shift();
@@ -516,10 +645,28 @@ function setCard(valId, val, cardId, warnT, critT) {
 // ============================================================
 //  UNITY postMessage
 // ============================================================
+// function sendToUnity(data) {
+//   const iframe = document.getElementById('unity-iframe');
+//   if (iframe && iframe.contentWindow) {
+//     iframe.contentWindow.postMessage({ type: 'sensorData', payload: data }, '*');
+//   }
+// }
 function sendToUnity(data) {
-  const iframe = document.getElementById('unity-iframe');
-  if (iframe && iframe.contentWindow) {
-    iframe.contentWindow.postMessage({ type: 'sensorData', payload: data }, '*');
+  try {
+    const iframe = document.getElementById('unity-iframe');
+    if (!iframe) return;
+    if (iframe.contentWindow && iframe.contentWindow.unityInstance) {
+      iframe.contentWindow.unityInstance.SendMessage(
+        'GameManager',
+        'ReceiveSensorData',
+        JSON.stringify(data)
+      );
+    }
+    if (iframe.contentWindow) {
+      iframe.contentWindow.postMessage({ type: 'sensorData', payload: data }, '*');
+    }
+  } catch(e) {
+    // ignoram eroarea cross-origin
   }
 }
 
@@ -530,8 +677,10 @@ function startLiveListener() {
   if (liveUnsubscribe) return;
   const ref = db.ref('/serverroom/live');
   const handler = ref.on('value', snap => {
+    if(currentMode !== 'live') return;
     const d = snap.val();
     if (!d) return;
+    // if(currentMode === 'whatif') return;
     displayData(d, null);
     pushChart(d.temp, d.humidity, d.gas_raw, d.vibration);
   });
@@ -577,12 +726,12 @@ async function sendWhatIfToESP() {
   statusEl.textContent = 'Se trimite...';
 
   try {
-    await db.ref('/serverroom/whatif').set({
+    await db.ref('/serverroom/live').set({
       temp, humidity: hum, gas_raw: gas, vibration: vib,
       active: true,
       timestamp: Date.now()
     });
-    statusEl.textContent = '✓ Valorile au fost trimise la ESP32!';
+    statusEl.textContent = '✓ S-au aplicat setarile!';
     setTimeout(() => statusEl.textContent = '', 3000);
   } catch(e) {
     statusEl.textContent = '✗ Eroare: ' + e.message;
@@ -594,7 +743,7 @@ function resetWhatIf() {
   document.getElementById('wi-hum').value  = 50;
   document.getElementById('wi-gas').value  = 500;
   document.getElementById('wi-vib').value  = 0;
-  db.ref('/serverroom/whatif').set({ active: false });
+  // db.ref('/serverroom/whatif').set({ active: false });
   updateWhatIf();
 }
 
@@ -708,8 +857,56 @@ async function loadHistory() {
 // ============================================================
 //  INIT
 // ============================================================
+// startLiveListener();
+// loadHistory();
+// document.getElementById("unity-iframe").onload = () => {
+//   document.getElementById("unity-placeholder").style.display = "none";
+// };
+
+// startLiveListener();
+// loadHistory();
+
+// document.getElementById("unity-iframe").onload = () => {
+//   // Ascunde placeholder
+//   const ph = document.getElementById("unity-placeholder");
+//   if (ph) ph.style.display = "none";
+
+//   // Capteaza unityInstance dupa ce Unity termina de incarcat
+//   const checkUnity = setInterval(() => {
+//     const iframe = document.getElementById('unity-iframe');
+//     if (iframe && iframe.contentWindow && iframe.contentWindow.unityInstance) {
+//       window.unityInstance = iframe.contentWindow.unityInstance;
+//       console.log('[Unity] Instanta capturata! SendMessage activ.');
+//       clearInterval(checkUnity);
+//     }
+//   }, 1000);
+// };
+
+// ============================================================
+//  INIT
+// ============================================================
 startLiveListener();
 loadHistory();
+
+document.getElementById("unity-iframe").onload = () => {
+  const ph = document.getElementById("unity-placeholder");
+  if (ph) ph.style.display = "none";
+
+  // Inițializează graficele DUPĂ ce Unity a luat contextul WebGL
+  setTimeout(() => initCharts(), 1500);
+
+  const checkUnity = setInterval(() => {
+    const iframe = document.getElementById('unity-iframe');
+    if (iframe && iframe.contentWindow && iframe.contentWindow.unityInstance) {
+      window.unityInstance = iframe.contentWindow.unityInstance;
+      console.log('[Unity] Instanta capturata! SendMessage activ.');
+      clearInterval(checkUnity);
+    }
+  }, 1000);
+};
+
+// Fallback: dacă iframe-ul nu declanșează onload (ex: CORS), init după 3s
+setTimeout(() => initCharts(), 3000);
 </script>
 </body>
 </html>

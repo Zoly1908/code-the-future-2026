@@ -32,11 +32,14 @@
 //  PRAGURI
 // ============================================================
 #define TEMP_WARN       28.0f   // galben + beep incet + fan
-#define TEMP_CRITICAL   32.0f   // rosu  + beep rapid + fan
+#define TEMP_CRITICAL   30.0f   // rosu  + beep rapid + fan
 #define HUM_WARN        70.0f   // galben (fara buzzer, fara fan)
 #define GAS_WARN        2800    // rosu  + beep rapid
 #define VIBRATION_WARN  0.8f    // rosu  + beep rapid
 
+// ============================================================
+//  WIFI
+// ============================================================
 
 
 // ============================================================
