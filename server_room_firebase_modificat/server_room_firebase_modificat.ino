@@ -1,6 +1,7 @@
 // ============================================================
 //  SERVER ROOM MONITOR — ESP32-C6 WROOM-1
 //  Firebase Realtime Database (live) + Firestore (istoric)
+//  Logica stare per senzor cu prioritate LED: Rosu > Galben > Verde
 // ============================================================
 
 #include <DHT.h>
@@ -9,7 +10,6 @@
 #include <WiFi.h>
 #include <Firebase_ESP_Client.h>
 
-// Firebase helper tokens
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"
 
@@ -28,11 +28,11 @@
 // ============================================================
 //  PRAGURI
 // ============================================================
-#define TEMP_WARN       28.0f
-#define TEMP_CRITICAL   32.0f
-#define HUM_WARN        70.0f
-#define GAS_WARN        2800
-#define VIBRATION_WARN  0.8f
+#define TEMP_WARN       28.0f   // galben + beep incet + fan
+#define TEMP_CRITICAL   32.0f   // rosu  + beep rapid + fan
+#define HUM_WARN        70.0f   // galben (fara buzzer, fara fan)
+#define GAS_WARN        2800    // rosu  + beep rapid
+#define VIBRATION_WARN  0.8f    // rosu  + beep rapid
 
 // ============================================================
 //  WIFI
@@ -41,11 +41,11 @@ const char* WIFI_SSID = "RobitzaPhone";
 const char* WIFI_PASS = "1panala8";
 
 // ============================================================
-//  FIREBASE — cheile tale
+//  FIREBASE
 // ============================================================
-#define API_KEY         "AIzaSyDEnIozeZ94N2l5Sk8eWch1EJsd0JW4zow"
-#define DATABASE_URL    "https://server-room-digital-twin-default-rtdb.europe-west1.firebasedatabase.app"
-#define PROJECT_ID      "server-room-digital-twin"
+#define API_KEY      "AIzaSyDEnIozeZ94N2l5Sk8eWch1EJsd0JW4zow"
+#define DATABASE_URL "https://server-room-digital-twin-default-rtdb.europe-west1.firebasedatabase.app"
+#define PROJECT_ID   "server-room-digital-twin"
 
 // ============================================================
 //  OBIECTE
@@ -59,10 +59,10 @@ FirebaseConfig config;
 
 float accelBaseX = 0, accelBaseY = 0, accelBaseZ = 0;
 
-unsigned long lastSend     = 0;
+unsigned long lastSend      = 0;
 unsigned long lastFirestore = 0;
-const long SEND_INTERVAL       = 2000;   // Realtime DB: la 2 secunde
-const long FIRESTORE_INTERVAL  = 30000;  // Firestore istoric: la 30 secunde
+const long SEND_INTERVAL      = 2000;
+const long FIRESTORE_INTERVAL = 30000;
 
 // ============================================================
 //  SETUP
@@ -83,11 +83,9 @@ void setup() {
   digitalWrite(LED_RED,    LOW);
   digitalWrite(BUZZER_PIN, LOW);
 
-  // DHT22
   dht.begin();
   Serial.println("[OK] DHT22 initializat.");
 
-  // MPU6050
   delay(2000);
   Wire.begin(8, 9);
   mpu.initialize();
@@ -98,25 +96,20 @@ void setup() {
     calibrateMPU();
   }
 
-  // WiFi
   connectWifi();
 
-  // Firebase config
-  config.api_key           = API_KEY;
-  config.database_url      = DATABASE_URL;
+  config.api_key               = API_KEY;
+  config.database_url          = DATABASE_URL;
   config.token_status_callback = tokenStatusCallback;
+  auth.user.email              = "";
+  auth.user.password           = "";
 
-  auth.user.email    = "";
-  auth.user.password = "";
-
-  // Autentificare anonima (fara user/pass)
   Firebase.signUp(&config, &auth, "", "");
   Firebase.begin(&config, &auth);
   Firebase.reconnectWiFi(true);
 
   Serial.println("[OK] Firebase initializat.");
 
-  // Semnal pornire
   buzzerBeep(2);
   digitalWrite(LED_GREEN, HIGH);
   Serial.println("\n[OK] Sistem pornit. Incep citirile...\n");
@@ -147,32 +140,59 @@ void loop() {
     pow(azG - accelBaseZ, 2)
   );
 
-  // ---- Evaluare stare ----
-  bool critical = false;
-  bool warn     = false;
-  String alerte = "";
+  // ---- Evaluare stare per senzor ----
+  // Prioritate LED: 2=rosu > 1=galben > 0=verde
+  int  ledPriority = 0;
+  bool fanOn       = false;
+  bool buzzerRapid = false;
+  bool buzzerIncet = false;
+  String alerte    = "";
+  String stare     = "OK";
 
-  if (!isnan(temp) && temp >= TEMP_CRITICAL) {
-    critical = true;
-    alerte += "TEMP_CRITICA ";
-  } else if (!isnan(temp) && temp >= TEMP_WARN) {
-    warn = true;
-    alerte += "TEMP_WARN ";
+  // TEMPERATURA
+  if (!isnan(temp)) {
+    if (temp > TEMP_CRITICAL) {
+      // Temp>32 -> rosu, beep rapid, fan
+      if (ledPriority < 2) ledPriority = 2;
+      fanOn       = true;
+      buzzerRapid = true;
+      alerte += "TEMP_CRITICA ";
+      stare = "CRITIC";
+    } else if (temp > TEMP_WARN) {
+      // Temp>28 -> galben, beep incet, fan
+      if (ledPriority < 1) ledPriority = 1;
+      fanOn       = true;
+      buzzerIncet = true;
+      alerte += "TEMP_WARN ";
+      if (stare == "OK") stare = "WARN";
+    }
   }
-  if (!isnan(hum) && hum >= HUM_WARN) {
-    warn = true;
+
+  // UMIDITATE
+  if (!isnan(hum) && hum > HUM_WARN) {
+    // Humidity>70 -> galben (fara fan, fara buzzer)
+    if (ledPriority < 1) ledPriority = 1;
     alerte += "HUM_WARN ";
-  }
-  if (gas >= GAS_WARN) {
-    critical = true;
-    alerte += "GAZ_DETECTAT ";
-  }
-  if (vibration >= VIBRATION_WARN) {
-    critical = true;
-    alerte += "VIBRATII ";
+    if (stare == "OK") stare = "WARN";
   }
 
-  String stare = critical ? "CRITIC" : (warn ? "WARN" : "OK");
+  // GAZ
+  if (gas > GAS_WARN) {
+    // Gas>2800 -> rosu, beep rapid
+    if (ledPriority < 2) ledPriority = 2;
+    buzzerRapid = true;
+    alerte += "GAZ_DETECTAT ";
+    stare = "CRITIC";
+  }
+
+  // VIBRATII
+  if (vibration > VIBRATION_WARN) {
+    // Gyro>0.8 -> rosu, beep rapid
+    if (ledPriority < 2) ledPriority = 2;
+    buzzerRapid = true;
+    alerte += "VIBRATII ";
+    stare = "CRITIC";
+  }
 
   // ---- Serial Monitor ----
   Serial.println("--- Citire noua ---");
@@ -181,6 +201,7 @@ void loop() {
   Serial.print("  Gaz (raw)   : "); Serial.println(gas);
   Serial.print("  Vibratie    : "); Serial.print(vibration, 3); Serial.println(" g");
   Serial.print("  Stare       : "); Serial.println(stare);
+  Serial.print("  LED         : "); Serial.println(ledPriority == 2 ? "ROSU" : ledPriority == 1 ? "GALBEN" : "VERDE");
   if (alerte.length() > 0) Serial.println("  Alerte: " + alerte);
   Serial.println("--------------------------------------------");
 
@@ -191,18 +212,26 @@ void loop() {
   digitalWrite(RELAY_PIN,  LOW);
   digitalWrite(BUZZER_PIN, LOW);
 
-  if (critical) {
-    digitalWrite(LED_RED,    HIGH);
-    digitalWrite(RELAY_PIN,  HIGH);
-    digitalWrite(BUZZER_PIN, HIGH);
-  } else if (warn) {
-    digitalWrite(LED_YELLOW, HIGH);
-    digitalWrite(RELAY_PIN,  HIGH);
-  } else {
-    digitalWrite(LED_GREEN,  HIGH);
+  // LED — doar cel mai prioritar
+  if      (ledPriority == 2) digitalWrite(LED_RED,    HIGH);
+  else if (ledPriority == 1) digitalWrite(LED_YELLOW, HIGH);
+  else                       digitalWrite(LED_GREEN,  HIGH);
+
+  // Fan
+  if (fanOn) digitalWrite(RELAY_PIN, HIGH);
+
+  // Buzzer — rapid are prioritate peste incet
+  if (buzzerRapid) {
+    for (int i = 0; i < 3; i++) {
+      digitalWrite(BUZZER_PIN, HIGH); delay(80);
+      digitalWrite(BUZZER_PIN, LOW);  delay(80);
+    }
+  } else if (buzzerIncet) {
+    digitalWrite(BUZZER_PIN, HIGH); delay(400);
+    digitalWrite(BUZZER_PIN, LOW);
   }
 
-  // ---- Firebase Realtime Database (live, pentru Unity) ----
+  // ---- Firebase Realtime Database ----
   if (Firebase.ready()) {
     FirebaseJson jsonLive;
     jsonLive.set("temp",      isnan(temp) ? -1 : temp);
@@ -220,7 +249,7 @@ void loop() {
     }
   }
 
-  // ---- Firestore (istoric, la fiecare 30 secunde) ----
+  // ---- Firestore (istoric la 30s) ----
   if (Firebase.ready() && (now - lastFirestore >= FIRESTORE_INTERVAL)) {
     lastFirestore = now;
 
@@ -234,13 +263,8 @@ void loop() {
     content.set("fields/timestamp/integerValue",(int)(millis() / 1000));
 
     if (Firebase.Firestore.createDocument(
-          &fbdoFirestore,
-          PROJECT_ID,
-          "",                  // location default
-          "history",           // collection
-          "",                  // auto document ID
-          content.raw(),
-          ""
+          &fbdoFirestore, PROJECT_ID, "",
+          "history", "", content.raw(), ""
         )) {
       Serial.println("[Firestore] Document istoric salvat OK");
     } else {
@@ -275,10 +299,8 @@ void calibrateMPU() {
 // ============================================================
 void buzzerBeep(int times) {
   for (int i = 0; i < times; i++) {
-    digitalWrite(BUZZER_PIN, HIGH);
-    delay(150);
-    digitalWrite(BUZZER_PIN, LOW);
-    delay(150);
+    digitalWrite(BUZZER_PIN, HIGH); delay(150);
+    digitalWrite(BUZZER_PIN, LOW);  delay(150);
   }
 }
 
