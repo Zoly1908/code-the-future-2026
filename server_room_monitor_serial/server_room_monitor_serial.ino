@@ -29,7 +29,7 @@
 #define TEMP_WARN         28.0f
 #define TEMP_CRITICAL     32.0f
 #define HUM_WARN          70.0f
-#define GAS_WARN          2700
+#define GAS_WARN          3000
 #define VIBRATION_WARN    0.8f
 
 // ============================================================
