@@ -12,6 +12,9 @@
 
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"
+#include <time.h>
+#define NTP_SERVER  "pool.ntp.org"
+#define UTC_OFFSET  7200  // Romania UTC+2 vara, pune 3600 iarna
 
 // ============================================================
 //  CONFIGURARE PINI
@@ -34,18 +37,7 @@
 #define GAS_WARN        2800    // rosu  + beep rapid
 #define VIBRATION_WARN  0.8f    // rosu  + beep rapid
 
-// ============================================================
-//  WIFI
-// ============================================================
-const char* WIFI_SSID = "RobitzaPhone";
-const char* WIFI_PASS = "1panala8";
 
-// ============================================================
-//  FIREBASE
-// ============================================================
-#define API_KEY      "AIzaSyDEnIozeZ94N2l5Sk8eWch1EJsd0JW4zow"
-#define DATABASE_URL "https://server-room-digital-twin-default-rtdb.europe-west1.firebasedatabase.app"
-#define PROJECT_ID   "server-room-digital-twin"
 
 // ============================================================
 //  OBIECTE
@@ -97,6 +89,13 @@ void setup() {
   }
 
   connectWifi();
+
+  // Sincronizare timp NTP
+  configTime(UTC_OFFSET, 0, NTP_SERVER);
+  Serial.print("Sincronizare NTP");
+  struct tm ti;
+  while (!getLocalTime(&ti)) { Serial.print("."); delay(500); }
+  Serial.println(" OK");
 
   config.api_key               = API_KEY;
   config.database_url          = DATABASE_URL;
@@ -260,7 +259,9 @@ void loop() {
     content.set("fields/vibration/doubleValue", vibration);
     content.set("fields/state/stringValue",     stare.c_str());
     content.set("fields/alerts/stringValue",    alerte.c_str());
-    content.set("fields/timestamp/integerValue",(int)(millis() / 1000));
+    // content.set("fields/timestamp/integerValue",(int)(millis() / 1000));
+    time_t now; time(&now);
+    content.set("fields/timestamp/integerValue", (int)now);
 
     if (Firebase.Firestore.createDocument(
           &fbdoFirestore, PROJECT_ID, "",

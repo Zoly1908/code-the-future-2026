@@ -5,301 +5,185 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Server Room Digital Twin</title>
 
-  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-
-  <!-- Chart.js pentru grafice -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Segoe UI',sans-serif; background:#0a0f1e; color:#e0e6f0; min-height:100vh; }
 
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #0a0f1e;
-      color: #e0e6f0;
-      min-height: 100vh;
-    }
-
+    /* HEADER */
     header {
-      background: #0d1530;
-      border-bottom: 1px solid #1e2d5a;
-      padding: 16px 32px;
-      display: flex;
-      align-items: center;
-      gap: 16px;
+      background:#0d1530; border-bottom:1px solid #1e2d5a;
+      padding:14px 28px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
     }
-
-    header h1 {
-      font-size: 1.3rem;
-      font-weight: 600;
-      color: #60a5fa;
-      letter-spacing: 1px;
-    }
-
-    .status-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: #6b7280;
-      animation: pulse 1.5s infinite;
-    }
-    .status-dot.online  { background: #22c55e; }
-    .status-dot.warn    { background: #f59e0b; }
-    .status-dot.critical{ background: #ef4444; }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0.4; }
-    }
+    header h1 { font-size:1.1rem; font-weight:600; color:#60a5fa; letter-spacing:1px; }
+    .status-dot { width:11px; height:11px; border-radius:50%; background:#6b7280; animation:pulse 1.5s infinite; }
+    .status-dot.online   { background:#22c55e; }
+    .status-dot.warn     { background:#f59e0b; }
+    .status-dot.critical { background:#ef4444; }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.4} }
 
     .state-badge {
-      margin-left: auto;
-      padding: 6px 18px;
-      border-radius: 20px;
-      font-weight: 700;
-      font-size: 0.9rem;
-      letter-spacing: 1px;
-      background: #1e2d5a;
-      color: #60a5fa;
-      transition: all 0.4s;
+      padding:5px 16px; border-radius:20px; font-weight:700; font-size:.85rem;
+      letter-spacing:1px; background:#1e2d5a; color:#60a5fa; transition:all .3s;
     }
-    .state-badge.OK       { background: #14532d; color: #4ade80; }
-    .state-badge.WARN     { background: #78350f; color: #fbbf24; }
-    .state-badge.CRITICAL { background: #7f1d1d; color: #f87171; }
+    .state-badge.OK       { background:#14532d; color:#4ade80; }
+    .state-badge.WARN     { background:#78350f; color:#fbbf24; }
+    .state-badge.CRITIC   { background:#7f1d1d; color:#f87171; }
 
-    .container {
-      max-width: 1300px;
-      margin: 0 auto;
-      padding: 24px 32px;
+    /* MODE TABS */
+    .mode-tabs {
+      margin-left:auto; display:flex; gap:6px;
+    }
+    .tab-btn {
+      padding:7px 18px; border-radius:8px; border:1px solid #1e2d5a;
+      background:transparent; color:#94a3b8; cursor:pointer; font-size:.82rem;
+      font-weight:600; transition:all .2s;
+    }
+    .tab-btn.active { background:#3b82f6; border-color:#3b82f6; color:white; }
+    .tab-btn:hover:not(.active) { border-color:#3b82f6; color:#60a5fa; }
+
+    .container { max-width:1400px; margin:0 auto; padding:20px 28px; }
+
+    /* MAIN LAYOUT */
+    .main-layout {
+      display:grid;
+      grid-template-columns:1fr 420px;
+      gap:20px;
+      margin-bottom:20px;
+    }
+    @media(max-width:900px) { .main-layout { grid-template-columns:1fr; } }
+
+    /* UNITY PANEL */
+    .unity-panel {
+      background:#0d1530; border:1px solid #1e2d5a; border-radius:14px;
+      overflow:hidden; position:relative; min-height:400px;
+      display:flex; flex-direction:column;
+    }
+    .unity-panel-header {
+      padding:12px 16px; border-bottom:1px solid #1e2d5a;
+      font-size:.8rem; color:#6b7280; display:flex; align-items:center; gap:8px;
+    }
+    .unity-dot { width:8px; height:8px; border-radius:50%; background:#22c55e; }
+    .unity-frame-wrap { flex:1; position:relative; min-height:360px; }
+    #unity-iframe {
+      width:100%; height:100%; border:none; min-height:360px;
+      background:#060b18;
+    }
+    .unity-placeholder {
+      position:absolute; inset:0; display:flex; flex-direction:column;
+      align-items:center; justify-content:center; gap:12px;
+      background:#060b18; color:#374151;
+    }
+    .unity-placeholder svg { width:64px; height:64px; opacity:.3; }
+    .unity-placeholder p { font-size:.85rem; text-align:center; line-height:1.6; }
+    .unity-placeholder code {
+      background:#0d1530; padding:4px 10px; border-radius:6px;
+      font-size:.78rem; color:#60a5fa; border:1px solid #1e2d5a;
+    }
+    .mode-label {
+      position:absolute; top:10px; right:10px;
+      background:#0d153099; border:1px solid #1e2d5a;
+      padding:4px 12px; border-radius:12px; font-size:.75rem; color:#94a3b8;
     }
 
-    /* CARDS LIVE */
+    /* RIGHT PANEL */
+    .right-panel { display:flex; flex-direction:column; gap:16px; }
+
+    /* CARDS */
     .cards-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 16px;
-      margin-bottom: 32px;
+      display:grid; grid-template-columns:1fr 1fr; gap:10px;
     }
-
     .card {
-      background: #0d1530;
-      border: 1px solid #1e2d5a;
-      border-radius: 14px;
-      padding: 22px;
-      transition: border-color 0.3s;
+      background:#0d1530; border:1px solid #1e2d5a; border-radius:12px; padding:16px;
+      transition:border-color .3s;
     }
-    .card:hover { border-color: #3b82f6; }
+    .card-label { font-size:.7rem; color:#6b7280; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; }
+    .card-value { font-size:1.8rem; font-weight:700; color:#60a5fa; line-height:1; }
+    .card-unit  { font-size:.8rem; color:#94a3b8; margin-top:3px; }
+    .card.warn     { border-color:#f59e0b; }
+    .card.warn .card-value { color:#fbbf24; }
+    .card.critical { border-color:#ef4444; }
+    .card.critical .card-value { color:#f87171; }
 
-    .card-label {
-      font-size: 0.75rem;
-      color: #6b7280;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 8px;
-    }
-
-    .card-value {
-      font-size: 2.2rem;
-      font-weight: 700;
-      color: #60a5fa;
-      line-height: 1;
-    }
-
-    .card-unit {
-      font-size: 0.9rem;
-      color: #94a3b8;
-      margin-top: 4px;
-    }
-
-    .card.warn  { border-color: #f59e0b; }
-    .card.warn .card-value { color: #fbbf24; }
-    .card.critical { border-color: #ef4444; }
-    .card.critical .card-value { color: #f87171; }
-
-    /* ALERTE */
+    /* ALERTS */
     .alerts-box {
-      background: #0d1530;
-      border: 1px solid #1e2d5a;
-      border-radius: 14px;
-      padding: 20px;
-      margin-bottom: 32px;
-      min-height: 60px;
+      background:#0d1530; border:1px solid #1e2d5a; border-radius:12px; padding:16px;
     }
-    .alerts-box h3 {
-      font-size: 0.8rem;
-      color: #6b7280;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 10px;
-    }
+    .alerts-box h3 { font-size:.75rem; color:#6b7280; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; }
     .alert-item {
-      background: #7f1d1d33;
-      border: 1px solid #ef444455;
-      border-radius: 8px;
-      padding: 8px 14px;
-      font-size: 0.9rem;
-      color: #f87171;
-      margin-bottom: 6px;
+      background:#7f1d1d33; border:1px solid #ef444455; border-radius:6px;
+      padding:6px 12px; font-size:.82rem; color:#f87171; margin-bottom:4px;
     }
-    .no-alerts { color: #4ade80; font-size: 0.9rem; }
+    .no-alerts { color:#4ade80; font-size:.85rem; }
 
-    /* GRAFICE */
+    /* WHAT IF PANEL */
+    .whatif-panel {
+      background:#0d1530; border:1px solid #1e2d5a; border-radius:12px; padding:18px;
+    }
+    .whatif-panel h3 { font-size:.78rem; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; margin-bottom:14px; }
+    .slider-row { margin-bottom:14px; }
+    .slider-row label { display:flex; justify-content:space-between; font-size:.82rem; color:#94a3b8; margin-bottom:4px; }
+    .slider-row label span { color:#60a5fa; font-weight:600; }
+    input[type=range] { width:100%; accent-color:#3b82f6; cursor:pointer; }
+    .whatif-btns { display:flex; gap:8px; margin-top:14px; }
+
+    /* HISTORY PANEL */
+    .history-panel {
+      background:#0d1530; border:1px solid #1e2d5a; border-radius:12px; padding:18px;
+    }
+    .history-panel h3 { font-size:.78rem; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; margin-bottom:14px; }
+    .resim-controls { display:flex; flex-direction:column; gap:10px; }
+    .resim-controls label { font-size:.8rem; color:#6b7280; margin-bottom:2px; display:block; }
+    .resim-controls input[type=datetime-local] {
+      width:100%; background:#060b18; border:1px solid #1e2d5a; border-radius:8px;
+      padding:8px 10px; color:#e0e6f0; font-size:.82rem;
+    }
+    .resim-player { display:flex; align-items:center; gap:10px; margin-top:10px; }
+    .resim-slider { flex:1; accent-color:#3b82f6; }
+    #resim-timestamp { font-size:.75rem; color:#6b7280; min-width:130px; }
+    #resim-info { font-size:.78rem; color:#6b7280; margin-top:8px; min-height:18px; }
+
+    /* CHARTS */
     .charts-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-      margin-bottom: 32px;
+      display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;
     }
-
-    @media (max-width: 768px) {
-      .charts-grid { grid-template-columns: 1fr; }
-    }
-
+    @media(max-width:700px) { .charts-grid { grid-template-columns:1fr; } }
     .chart-card {
-      background: #0d1530;
-      border: 1px solid #1e2d5a;
-      border-radius: 14px;
-      padding: 20px;
+      background:#0d1530; border:1px solid #1e2d5a; border-radius:12px; padding:16px;
     }
+    .chart-card h3 { font-size:.75rem; color:#6b7280; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; }
 
-    .chart-card h3 {
-      font-size: 0.85rem;
-      color: #94a3b8;
-      margin-bottom: 16px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
+    /* HISTORY TABLE */
+    .history-table-section {
+      background:#0d1530; border:1px solid #1e2d5a; border-radius:12px; padding:18px; margin-bottom:20px;
     }
+    .history-table-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+    .history-table-header h3 { font-size:.78rem; color:#94a3b8; text-transform:uppercase; letter-spacing:1px; }
+    table { width:100%; border-collapse:collapse; font-size:.82rem; }
+    th { text-align:left; padding:8px 10px; color:#6b7280; border-bottom:1px solid #1e2d5a; font-weight:500; }
+    td { padding:8px 10px; border-bottom:1px solid #0f1a35; color:#cbd5e1; }
+    tr:hover td { background:#0f1a35; }
+    .badge { padding:2px 9px; border-radius:10px; font-size:.72rem; font-weight:700; }
+    .badge.OK     { background:#14532d; color:#4ade80; }
+    .badge.WARN   { background:#78350f; color:#fbbf24; }
+    .badge.CRITIC { background:#7f1d1d; color:#f87171; }
 
-    /* ISTORIC */
-    .history-section {
-      background: #0d1530;
-      border: 1px solid #1e2d5a;
-      border-radius: 14px;
-      padding: 20px;
-      margin-bottom: 32px;
-    }
+    /* BUTTONS */
+    .btn { padding:8px 16px; border-radius:8px; border:none; cursor:pointer; font-size:.82rem; font-weight:600; transition:opacity .2s; }
+    .btn:hover { opacity:.8; }
+    .btn-primary { background:#3b82f6; color:white; }
+    .btn-danger  { background:#ef4444; color:white; }
+    .btn-green   { background:#16a34a; color:white; }
+    .btn-gray    { background:#374151; color:#e0e6f0; }
 
-    .history-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 16px;
-    }
+    footer { text-align:center; padding:16px; color:#374151; font-size:.75rem; }
 
-    .history-header h3 {
-      font-size: 0.85rem;
-      color: #94a3b8;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-
-    .btn {
-      padding: 8px 18px;
-      border-radius: 8px;
-      border: none;
-      cursor: pointer;
-      font-size: 0.85rem;
-      font-weight: 600;
-      transition: opacity 0.2s;
-    }
-    .btn:hover { opacity: 0.8; }
-    .btn-primary { background: #3b82f6; color: white; }
-    .btn-danger  { background: #ef4444; color: white; }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.85rem;
-    }
-
-    th {
-      text-align: left;
-      padding: 10px 12px;
-      color: #6b7280;
-      border-bottom: 1px solid #1e2d5a;
-      font-weight: 500;
-    }
-
-    td {
-      padding: 10px 12px;
-      border-bottom: 1px solid #0f1a35;
-      color: #cbd5e1;
-    }
-
-    tr:hover td { background: #0f1a35; }
-
-    .badge {
-      padding: 3px 10px;
-      border-radius: 12px;
-      font-size: 0.75rem;
-      font-weight: 700;
-    }
-    .badge.OK       { background: #14532d; color: #4ade80; }
-    .badge.WARN     { background: #78350f; color: #fbbf24; }
-    .badge.CRITIC   { background: #7f1d1d; color: #f87171; }
-
-    /* RESIMULARE */
-    .resim-section {
-      background: #0d1530;
-      border: 1px solid #1e2d5a;
-      border-radius: 14px;
-      padding: 20px;
-      margin-bottom: 32px;
-    }
-
-    .resim-section h3 {
-      font-size: 0.85rem;
-      color: #94a3b8;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 16px;
-    }
-
-    .resim-controls {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      flex-wrap: wrap;
-      margin-bottom: 16px;
-    }
-
-    .resim-controls label { font-size: 0.85rem; color: #94a3b8; }
-    .resim-controls input[type="datetime-local"] {
-      background: #0a0f1e;
-      border: 1px solid #1e2d5a;
-      border-radius: 8px;
-      padding: 8px 12px;
-      color: #e0e6f0;
-      font-size: 0.85rem;
-    }
-
-    .resim-player {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-top: 12px;
-    }
-
-    .resim-slider {
-      flex: 1;
-      accent-color: #3b82f6;
-    }
-
-    #resim-timestamp {
-      font-size: 0.8rem;
-      color: #6b7280;
-      min-width: 160px;
-    }
-
-    footer {
-      text-align: center;
-      padding: 20px;
-      color: #374151;
-      font-size: 0.8rem;
-    }
+    /* HIDDEN */
+    .hidden { display:none !important; }
   </style>
 </head>
 <body>
@@ -308,103 +192,185 @@
   <div class="status-dot" id="statusDot"></div>
   <h1>⚙ SERVER ROOM DIGITAL TWIN</h1>
   <div class="state-badge" id="stateBadge">CONNECTING...</div>
+  <div class="mode-tabs">
+    <button class="tab-btn active" onclick="setMode('live')"    id="tab-live">📡 Live</button>
+    <button class="tab-btn"        onclick="setMode('whatif')"  id="tab-whatif">🔬 What If</button>
+    <button class="tab-btn"        onclick="setMode('history')" id="tab-history">⏪ Istoric</button>
+  </div>
 </header>
 
 <div class="container">
 
-  <!-- CARDS LIVE -->
-  <div class="cards-grid">
-    <div class="card" id="card-temp">
-      <div class="card-label">🌡 Temperatura</div>
-      <div class="card-value" id="val-temp">--</div>
-      <div class="card-unit">°C</div>
+  <!-- MAIN LAYOUT: Unity + Right Panel -->
+  <div class="main-layout">
+
+    <!-- UNITY -->
+    <div class="unity-panel">
+      <div class="unity-panel-header">
+        <div class="unity-dot"></div>
+        Digital Twin 3D — Unity WebGL
+        <span id="unity-mode-label" style="margin-left:auto;font-size:.75rem;color:#3b82f6;">MOD: LIVE</span>
+      </div>
+      <div class="unity-frame-wrap">
+        <!--
+          UNITY INTEGRATION:
+          Uncomment iframe-ul de jos si pune URL-ul serverului tau Unity WebGL.
+          Ex: python -m http.server 8080 in folderul cu build-ul Unity
+          Apoi: <iframe id="unity-iframe" src="http://localhost:8080"></iframe>
+        -->
+        <!-- <iframe id="unity-iframe" src="http://localhost:8080" allow="autoplay"></iframe> -->
+
+        <!-- PLACEHOLDER — sterge asta cand ai build-ul Unity gata -->
+        <div class="unity-placeholder" id="unity-placeholder">
+          <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="50,5 95,75 5,75" stroke="#4b5563" stroke-width="4" fill="none"/>
+            <circle cx="50" cy="50" r="15" stroke="#4b5563" stroke-width="4" fill="none"/>
+          </svg>
+          <p>Unity WebGL Build<br>nu este inca conectat</p>
+          <p>Pentru a conecta:<br>
+            1. Fa build WebGL din Unity<br>
+            2. Ruleaza: <code>python -m http.server 8080</code><br>
+            3. Decommenteaza iframe-ul din HTML
+          </p>
+        </div>
+        <div class="mode-label" id="mode-label-3d">🟢 LIVE</div>
+      </div>
     </div>
-    <div class="card" id="card-hum">
-      <div class="card-label">💧 Umiditate</div>
-      <div class="card-value" id="val-hum">--</div>
-      <div class="card-unit">%</div>
-    </div>
-    <div class="card" id="card-gas">
-      <div class="card-label">💨 Gaz / Fum</div>
-      <div class="card-value" id="val-gas">--</div>
-      <div class="card-unit">raw ADC</div>
-    </div>
-    <div class="card" id="card-vib">
-      <div class="card-label">📳 Vibratii</div>
-      <div class="card-value" id="val-vib">--</div>
-      <div class="card-unit">g</div>
-    </div>
-    <div class="card">
-      <div class="card-label">⏱ Uptime</div>
-      <div class="card-value" id="val-uptime">--</div>
-      <div class="card-unit">secunde</div>
+
+    <!-- RIGHT PANEL -->
+    <div class="right-panel">
+
+      <!-- CARDS LIVE (vizibile in modul live si what-if) -->
+      <div id="cards-section">
+        <div class="cards-grid">
+          <div class="card" id="card-temp">
+            <div class="card-label">🌡 Temperatura</div>
+            <div class="card-value" id="val-temp">--</div>
+            <div class="card-unit">°C</div>
+          </div>
+          <div class="card" id="card-hum">
+            <div class="card-label">💧 Umiditate</div>
+            <div class="card-value" id="val-hum">--</div>
+            <div class="card-unit">%</div>
+          </div>
+          <div class="card" id="card-gas">
+            <div class="card-label">💨 Gaz</div>
+            <div class="card-value" id="val-gas">--</div>
+            <div class="card-unit">raw ADC</div>
+          </div>
+          <div class="card" id="card-vib">
+            <div class="card-label">📳 Vibratii</div>
+            <div class="card-value" id="val-vib">--</div>
+            <div class="card-unit">g</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ALERTS -->
+      <div class="alerts-box" id="alerts-section">
+        <h3>⚠ Alerte active</h3>
+        <div id="alerts-container"><span class="no-alerts">✓ Nicio alerta</span></div>
+      </div>
+
+      <!-- WHAT IF PANEL -->
+      <div class="whatif-panel hidden" id="whatif-section">
+        <h3>🔬 Simulare manuala — What If</h3>
+
+        <div class="slider-row">
+          <label>Temperatura <span id="wi-temp-val">25.0</span> °C</label>
+          <input type="range" id="wi-temp" min="15" max="60" step="0.5" value="25"
+            oninput="updateWhatIf()">
+        </div>
+        <div class="slider-row">
+          <label>Umiditate <span id="wi-hum-val">50</span> %</label>
+          <input type="range" id="wi-hum" min="0" max="100" step="1" value="50"
+            oninput="updateWhatIf()">
+        </div>
+        <div class="slider-row">
+          <label>Gaz (raw) <span id="wi-gas-val">500</span></label>
+          <input type="range" id="wi-gas" min="0" max="4095" step="10" value="500"
+            oninput="updateWhatIf()">
+        </div>
+        <div class="slider-row">
+          <label>Vibratii <span id="wi-vib-val">0.00</span> g</label>
+          <input type="range" id="wi-vib" min="0" max="3" step="0.01" value="0"
+            oninput="updateWhatIf()">
+        </div>
+
+        <div class="whatif-btns">
+          <button class="btn btn-green"   onclick="sendWhatIfToESP()">▶ Trimite la ESP32</button>
+          <button class="btn btn-gray"    onclick="resetWhatIf()">↺ Reset</button>
+        </div>
+        <div id="whatif-status" style="margin-top:10px;font-size:.78rem;color:#6b7280;"></div>
+      </div>
+
+      <!-- HISTORY PLAYER PANEL -->
+      <div class="history-panel hidden" id="history-section">
+        <h3>⏪ Rulare Istoric</h3>
+        <div class="resim-controls">
+          <div>
+            <label>De la:</label>
+            <input type="datetime-local" id="resim-start">
+          </div>
+          <div>
+            <label>Pana la:</label>
+            <input type="datetime-local" id="resim-end">
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary" onclick="loadResimulation()">Incarca</button>
+            <button class="btn btn-danger"  onclick="stopResimulation()">Stop</button>
+          </div>
+        </div>
+        <div class="resim-player">
+          <input type="range" class="resim-slider" id="resim-slider" min="0" value="0" disabled>
+          <span id="resim-timestamp">--</span>
+        </div>
+        <div id="resim-info"></div>
+      </div>
+
     </div>
   </div>
 
-  <!-- ALERTE -->
-  <div class="alerts-box">
-    <h3>⚠ Alerte active</h3>
-    <div id="alerts-container"><span class="no-alerts">✓ Nicio alerta activa</span></div>
-  </div>
-
-  <!-- GRAFICE -->
+  <!-- CHARTS -->
   <div class="charts-grid">
     <div class="chart-card">
-      <h3>Temperatura (ultimele 30 citiri)</h3>
+      <h3>Temperatura (ultimele 30)</h3>
       <canvas id="chartTemp"></canvas>
     </div>
     <div class="chart-card">
-      <h3>Umiditate (ultimele 30 citiri)</h3>
+      <h3>Umiditate (ultimele 30)</h3>
       <canvas id="chartHum"></canvas>
     </div>
     <div class="chart-card">
-      <h3>Gaz (ultimele 30 citiri)</h3>
+      <h3>Gaz (ultimele 30)</h3>
       <canvas id="chartGas"></canvas>
     </div>
     <div class="chart-card">
-      <h3>Vibratii (ultimele 30 citiri)</h3>
+      <h3>Vibratii (ultimele 30)</h3>
       <canvas id="chartVib"></canvas>
     </div>
   </div>
 
-  <!-- RESIMULARE -->
-  <div class="resim-section">
-    <h3>▶ Resimulare istoric</h3>
-    <div class="resim-controls">
-      <label>De la:</label>
-      <input type="datetime-local" id="resim-start">
-      <label>Pana la:</label>
-      <input type="datetime-local" id="resim-end">
-      <button class="btn btn-primary" onclick="loadResimulation()">Incarca</button>
-      <button class="btn btn-danger"  onclick="stopResimulation()">Stop</button>
-    </div>
-    <div class="resim-player">
-      <input type="range" class="resim-slider" id="resim-slider" min="0" value="0" disabled>
-      <span id="resim-timestamp">--</span>
-    </div>
-    <div id="resim-info" style="margin-top:10px; font-size:0.85rem; color:#6b7280;"></div>
-  </div>
-
-  <!-- ISTORIC -->
-  <div class="history-section">
-    <div class="history-header">
-      <h3>📋 Istoric inregistrari (Firestore)</h3>
+  <!-- HISTORY TABLE -->
+  <div class="history-table-section">
+    <div class="history-table-header">
+      <h3>📋 Istoric Firestore</h3>
       <button class="btn btn-primary" onclick="loadHistory()">Reincarca</button>
     </div>
     <table>
       <thead>
         <tr>
-          <th>Timestamp</th>
+          <th>Data / Ora</th>
           <th>Temp (°C)</th>
-          <th>Umiditate (%)</th>
+          <th>Umid (%)</th>
           <th>Gaz</th>
-          <th>Vibratii (g)</th>
+          <th>Vibr (g)</th>
           <th>Stare</th>
           <th>Alerte</th>
         </tr>
       </thead>
       <tbody id="history-body">
-        <tr><td colspan="7" style="color:#6b7280; text-align:center;">Se incarca...</td></tr>
+        <tr><td colspan="7" style="color:#6b7280;text-align:center;">Se incarca...</td></tr>
       </tbody>
     </table>
   </div>
@@ -415,165 +381,225 @@
 
 <script>
 // ============================================================
-//  FIREBASE CONFIG
+//  FIREBASE
 // ============================================================
-const firebaseConfig = {
-  apiKey:            "AIzaSyDEnIozeZ94N2l5Sk8eWch1EJsd0JW4zow",
-  authDomain:        "server-room-digital-twin.firebaseapp.com",
-  databaseURL:       "https://server-room-digital-twin-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId:         "server-room-digital-twin",
-  storageBucket:     "server-room-digital-twin.firebasestorage.app",
-  messagingSenderId: "508550695729",
-  appId:             "1:508550695729:web:7e44808be8836a45dabe10"
-};
 
 firebase.initializeApp(firebaseConfig);
 const db        = firebase.database();
 const firestore = firebase.firestore();
 
 // ============================================================
-//  GRAFICE
+//  MODE MANAGEMENT
 // ============================================================
-const MAX_POINTS = 30;
-const labels = [];
-const chartData = { temp: [], hum: [], gas: [], vib: [] };
+let currentMode = 'live';
+let liveUnsubscribe = null;
 
-function makeChart(id, label, color) {
+function setMode(mode) {
+  currentMode = mode;
+
+  // Tabs
+  ['live','whatif','history'].forEach(m => {
+    document.getElementById('tab-' + m).classList.toggle('active', m === mode);
+  });
+
+  // Panels
+  document.getElementById('whatif-section').classList.toggle('hidden', mode !== 'whatif');
+  document.getElementById('history-section').classList.toggle('hidden', mode !== 'history');
+  document.getElementById('alerts-section').classList.toggle('hidden', mode === 'history');
+
+  // Mode label Unity
+  const labels = { live:'🟢 LIVE', whatif:'🔬 WHAT IF', history:'⏪ ISTORIC' };
+  document.getElementById('unity-mode-label').textContent = 'MOD: ' + mode.toUpperCase();
+  document.getElementById('mode-label-3d').textContent = labels[mode];
+
+  if (mode === 'live') {
+    startLiveListener();
+  } else {
+    stopLiveListener();
+    if (mode === 'whatif') updateWhatIf();
+    if (mode === 'history') stopResimulation();
+  }
+}
+
+// ============================================================
+//  CHARTS
+// ============================================================
+const MAX_PTS = 30;
+const chartLabels = [];
+const chartData = { temp:[], hum:[], gas:[], vib:[] };
+
+function makeChart(id, label, color, key) {
   return new Chart(document.getElementById(id), {
     type: 'line',
     data: {
-      labels: labels,
+      labels: chartLabels,
       datasets: [{
-        label,
-        data: chartData[id.replace('chart','').toLowerCase()],
-        borderColor: color,
-        backgroundColor: color + '22',
-        borderWidth: 2,
-        pointRadius: 2,
-        tension: 0.3,
-        fill: true
+        label, data: chartData[key],
+        borderColor: color, backgroundColor: color + '22',
+        borderWidth: 2, pointRadius: 2, tension: 0.3, fill: true
       }]
     },
     options: {
-      responsive: true,
-      animation: false,
+      responsive: true, animation: false,
       plugins: { legend: { display: false } },
       scales: {
-        x: { ticks: { color: '#4b5563', maxTicksLimit: 6 }, grid: { color: '#1e2d5a' } },
-        y: { ticks: { color: '#4b5563' },                   grid: { color: '#1e2d5a' } }
+        x: { ticks:{ color:'#4b5563', maxTicksLimit:5 }, grid:{ color:'#1e2d5a' } },
+        y: { ticks:{ color:'#4b5563' },                  grid:{ color:'#1e2d5a' } }
       }
     }
   });
 }
-
 const charts = {
-  temp: makeChart('chartTemp', 'Temperatura', '#60a5fa'),
-  hum:  makeChart('chartHum',  'Umiditate',   '#34d399'),
-  gas:  makeChart('chartGas',  'Gaz',         '#f59e0b'),
-  vib:  makeChart('chartVib',  'Vibratii',    '#a78bfa'),
+  temp: makeChart('chartTemp','Temp','#60a5fa','temp'),
+  hum:  makeChart('chartHum', 'Hum', '#34d399','hum'),
+  gas:  makeChart('chartGas', 'Gas', '#f59e0b','gas'),
+  vib:  makeChart('chartVib', 'Vib', '#a78bfa','vib'),
 };
 
-function pushToChart(temp, hum, gas, vib) {
+function pushChart(temp, hum, gas, vib) {
   const t = new Date().toLocaleTimeString('ro-RO');
-  if (labels.length >= MAX_POINTS) {
-    labels.shift();
-    chartData.temp.shift();
-    chartData.hum.shift();
-    chartData.gas.shift();
-    chartData.vib.shift();
+  if (chartLabels.length >= MAX_PTS) {
+    chartLabels.shift();
+    Object.values(chartData).forEach(a => a.shift());
   }
-  labels.push(t);
-  chartData.temp.push(temp);
-  chartData.hum.push(hum);
-  chartData.gas.push(gas);
-  chartData.vib.push(vib);
+  chartLabels.push(t);
+  chartData.temp.push(temp); chartData.hum.push(hum);
+  chartData.gas.push(gas);   chartData.vib.push(vib);
   Object.values(charts).forEach(c => c.update());
 }
 
 // ============================================================
-//  REALTIME DATABASE — date live
+//  DISPLAY DATA (carduri + unity message)
 // ============================================================
-db.ref('/serverroom/live').on('value', snap => {
-  const d = snap.val();
-  if (!d) return;
-
-  // Cards
+function displayData(d, modeLabel) {
   setCard('temp', d.temp,      'card-temp', 28, 32);
   setCard('hum',  d.humidity,  'card-hum',  70, 90);
-  setCard('gas',  d.gas_raw,   'card-gas',  2000, 2700);
-  setCard('vib',  d.vibration ? d.vibration.toFixed(3) : '--', 'card-vib', 0.5, 0.8);
-  document.getElementById('val-uptime').textContent = d.uptime_s ?? '--';
+  setCard('gas',  d.gas_raw,   'card-gas',  2000, 2800);
+  const vibVal = typeof d.vibration === 'number' ? d.vibration.toFixed(3) : '--';
+  document.getElementById('val-vib').textContent = vibVal;
+  const vibCard = document.getElementById('card-vib');
+  vibCard.className = 'card' + (d.vibration >= 0.8 ? ' critical' : '');
 
   // State badge
   const badge = document.getElementById('stateBadge');
   const dot   = document.getElementById('statusDot');
-  badge.textContent  = d.state || 'OK';
-  badge.className    = 'state-badge ' + (d.state || 'OK');
-  dot.className      = 'status-dot ' + (d.state === 'CRITIC' ? 'critical' : d.state === 'WARN' ? 'warn' : 'online');
+  const s = d.state || 'OK';
+  badge.textContent = (modeLabel ? '[' + modeLabel + '] ' : '') + s;
+  badge.className   = 'state-badge ' + s;
+  dot.className     = 'status-dot ' + (s === 'CRITIC' ? 'critical' : s === 'WARN' ? 'warn' : 'online');
 
   // Alerte
   const alertsEl = document.getElementById('alerts-container');
   if (d.alerts && d.alerts.trim().length > 0) {
     alertsEl.innerHTML = d.alerts.trim().split(' ')
       .filter(a => a.length > 0)
-      .map(a => `<div class="alert-item">⚠ ${a}</div>`)
-      .join('');
+      .map(a => `<div class="alert-item">⚠ ${a}</div>`).join('');
   } else {
     alertsEl.innerHTML = '<span class="no-alerts">✓ Nicio alerta activa</span>';
   }
 
-  // Grafice
-  pushToChart(d.temp, d.humidity, d.gas_raw, d.vibration);
-});
+  // Trimite la Unity prin postMessage
+  sendToUnity({ mode: currentMode, temp: d.temp, humidity: d.humidity,
+    gas_raw: d.gas_raw, vibration: d.vibration, state: s, alerts: d.alerts });
+}
 
-function setCard(valId, val, cardId, warnThreshold, critThreshold) {
+function setCard(valId, val, cardId, warnT, critT) {
   const el   = document.getElementById('val-' + valId);
   const card = document.getElementById(cardId);
-  el.textContent = (val !== undefined && val !== -1) ? (typeof val === 'number' ? val.toFixed(1) : val) : '--';
+  el.textContent = (val !== undefined && val !== -1 && val !== null)
+    ? (typeof val === 'number' ? val.toFixed(1) : val) : '--';
   card.className = 'card';
-  if (val >= critThreshold)  card.classList.add('critical');
-  else if (val >= warnThreshold) card.classList.add('warn');
+  if (val >= critT)      card.classList.add('critical');
+  else if (val >= warnT) card.classList.add('warn');
 }
 
 // ============================================================
-//  FIRESTORE — istoric
+//  UNITY postMessage
 // ============================================================
-async function loadHistory() {
-  const tbody = document.getElementById('history-body');
-  tbody.innerHTML = '<tr><td colspan="7" style="color:#6b7280;text-align:center;">Se incarca...</td></tr>';
-
-  try {
-    const snap = await firestore.collection('history')
-      .orderBy('timestamp', 'desc')
-      .limit(50)
-      .get();
-
-    if (snap.empty) {
-      tbody.innerHTML = '<tr><td colspan="7" style="color:#6b7280;text-align:center;">Nicio inregistrare inca.</td></tr>';
-      return;
-    }
-
-    tbody.innerHTML = snap.docs.map(doc => {
-      const d = doc.data();
-      const ts = new Date(d.timestamp * 1000).toLocaleString('ro-RO');
-      const stateClass = d.state === 'CRITIC' ? 'CRITIC' : d.state === 'WARN' ? 'WARN' : 'OK';
-      return `<tr>
-        <td>${ts}</td>
-        <td>${d.temp?.toFixed(1) ?? '--'}</td>
-        <td>${d.humidity?.toFixed(1) ?? '--'}</td>
-        <td>${d.gas_raw ?? '--'}</td>
-        <td>${d.vibration?.toFixed(3) ?? '--'}</td>
-        <td><span class="badge ${stateClass}">${d.state ?? 'OK'}</span></td>
-        <td style="font-size:0.8rem;color:#94a3b8">${d.alerts || '—'}</td>
-      </tr>`;
-    }).join('');
-  } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="7" style="color:#ef4444;">Eroare: ${e.message}</td></tr>`;
+function sendToUnity(data) {
+  const iframe = document.getElementById('unity-iframe');
+  if (iframe && iframe.contentWindow) {
+    iframe.contentWindow.postMessage({ type: 'sensorData', payload: data }, '*');
   }
 }
 
 // ============================================================
-//  RESIMULARE
+//  MOD LIVE — Realtime DB
+// ============================================================
+function startLiveListener() {
+  if (liveUnsubscribe) return;
+  const ref = db.ref('/serverroom/live');
+  const handler = ref.on('value', snap => {
+    const d = snap.val();
+    if (!d) return;
+    displayData(d, null);
+    pushChart(d.temp, d.humidity, d.gas_raw, d.vibration);
+  });
+  liveUnsubscribe = () => ref.off('value', handler);
+}
+
+function stopLiveListener() {
+  if (liveUnsubscribe) { liveUnsubscribe(); liveUnsubscribe = null; }
+}
+
+// ============================================================
+//  MOD WHAT IF
+// ============================================================
+function updateWhatIf() {
+  const temp = parseFloat(document.getElementById('wi-temp').value);
+  const hum  = parseFloat(document.getElementById('wi-hum').value);
+  const gas  = parseInt(document.getElementById('wi-gas').value);
+  const vib  = parseFloat(document.getElementById('wi-vib').value);
+
+  document.getElementById('wi-temp-val').textContent = temp.toFixed(1);
+  document.getElementById('wi-hum-val').textContent  = hum;
+  document.getElementById('wi-gas-val').textContent  = gas;
+  document.getElementById('wi-vib-val').textContent  = vib.toFixed(2);
+
+  // Evalueaza stare
+  let state = 'OK'; let alerts = '';
+  if (temp > 32)  { state = 'CRITIC'; alerts += 'TEMP_CRITICA '; }
+  else if (temp > 28) { if (state === 'OK') state = 'WARN'; alerts += 'TEMP_WARN '; }
+  if (hum  > 70)  { if (state === 'OK') state = 'WARN'; alerts += 'HUM_WARN '; }
+  if (gas  > 2800){ state = 'CRITIC'; alerts += 'GAZ_DETECTAT '; }
+  if (vib  > 0.8) { state = 'CRITIC'; alerts += 'VIBRATII '; }
+
+  displayData({ temp, humidity: hum, gas_raw: gas, vibration: vib, state, alerts }, 'WHAT IF');
+}
+
+async function sendWhatIfToESP() {
+  const temp = parseFloat(document.getElementById('wi-temp').value);
+  const hum  = parseFloat(document.getElementById('wi-hum').value);
+  const gas  = parseInt(document.getElementById('wi-gas').value);
+  const vib  = parseFloat(document.getElementById('wi-vib').value);
+
+  const statusEl = document.getElementById('whatif-status');
+  statusEl.textContent = 'Se trimite...';
+
+  try {
+    await db.ref('/serverroom/whatif').set({
+      temp, humidity: hum, gas_raw: gas, vibration: vib,
+      active: true,
+      timestamp: Date.now()
+    });
+    statusEl.textContent = '✓ Valorile au fost trimise la ESP32!';
+    setTimeout(() => statusEl.textContent = '', 3000);
+  } catch(e) {
+    statusEl.textContent = '✗ Eroare: ' + e.message;
+  }
+}
+
+function resetWhatIf() {
+  document.getElementById('wi-temp').value = 25;
+  document.getElementById('wi-hum').value  = 50;
+  document.getElementById('wi-gas').value  = 500;
+  document.getElementById('wi-vib').value  = 0;
+  db.ref('/serverroom/whatif').set({ active: false });
+  updateWhatIf();
+}
+
+// ============================================================
+//  MOD ISTORIC — Resimulare
 // ============================================================
 let resimData = [];
 let resimInterval = null;
@@ -582,69 +608,52 @@ async function loadResimulation() {
   stopResimulation();
   const start = document.getElementById('resim-start').value;
   const end   = document.getElementById('resim-end').value;
-
-  if (!start || !end) {
-    alert('Selecteaza intervalul de timp!');
-    return;
-  }
+  if (!start || !end) { alert('Selecteaza intervalul!'); return; }
 
   const startTs = Math.floor(new Date(start).getTime() / 1000);
-  const endTs   = Math.floor(new Date(end).getTime() / 1000);
-
-  document.getElementById('resim-info').textContent = 'Se incarca datele istorice...';
+  const endTs   = Math.floor(new Date(end).getTime()   / 1000);
+  document.getElementById('resim-info').textContent = 'Se incarca...';
 
   try {
     const snap = await firestore.collection('history')
       .where('timestamp', '>=', startTs)
       .where('timestamp', '<=', endTs)
-      .orderBy('timestamp', 'asc')
-      .get();
+      .orderBy('timestamp', 'asc').get();
 
     if (snap.empty) {
       document.getElementById('resim-info').textContent = 'Nicio data in intervalul selectat.';
       return;
     }
-
     resimData = snap.docs.map(d => d.data());
     const slider = document.getElementById('resim-slider');
-    slider.max   = resimData.length - 1;
+    slider.max = resimData.length - 1;
     slider.value = 0;
     slider.disabled = false;
-
     document.getElementById('resim-info').textContent =
-      `${resimData.length} inregistrari incarcate. Foloseste slider-ul sau apasa Play.`;
+      resimData.length + ' inregistrari. Ruleaza automat...';
 
-    // Afiseaza primul frame
     showResimFrame(0);
-
-    // Autoplay
     let idx = 0;
     resimInterval = setInterval(() => {
       idx++;
       if (idx >= resimData.length) { stopResimulation(); return; }
       slider.value = idx;
       showResimFrame(idx);
-    }, 500);
-
-  } catch (e) {
+    }, 800);
+  } catch(e) {
     document.getElementById('resim-info').textContent = 'Eroare: ' + e.message;
   }
 }
 
 function showResimFrame(idx) {
-  const d  = resimData[idx];
+  const d = resimData[idx];
   const ts = new Date(d.timestamp * 1000).toLocaleString('ro-RO');
   document.getElementById('resim-timestamp').textContent = ts;
-
-  // Actualizeaza cards cu datele istorice
-  setCard('temp', d.temp,      'card-temp', 28, 32);
-  setCard('hum',  d.humidity,  'card-hum',  70, 90);
-  setCard('gas',  d.gas_raw,   'card-gas',  2000, 2700);
-  document.getElementById('val-vib').textContent = d.vibration?.toFixed(3) ?? '--';
-
-  const badge = document.getElementById('stateBadge');
-  badge.textContent = '[RESIM] ' + (d.state || 'OK');
-  badge.className   = 'state-badge ' + (d.state || 'OK');
+  displayData({
+    temp: d.temp, humidity: d.humidity,
+    gas_raw: d.gas_raw, vibration: d.vibration,
+    state: d.state, alerts: d.alerts
+  }, 'ISTORIC');
 }
 
 function stopResimulation() {
@@ -658,9 +667,49 @@ document.getElementById('resim-slider').addEventListener('input', e => {
   if (resimData.length > 0) showResimFrame(parseInt(e.target.value));
 });
 
-// Incarca istoricul la start
+// ============================================================
+//  HISTORY TABLE
+// ============================================================
+async function loadHistory() {
+  const tbody = document.getElementById('history-body');
+  tbody.innerHTML = '<tr><td colspan="7" style="color:#6b7280;text-align:center;">Se incarca...</td></tr>';
+  try {
+    const snap = await firestore.collection('history')
+      .orderBy('timestamp', 'desc').limit(50).get();
+    if (snap.empty) {
+      tbody.innerHTML = '<tr><td colspan="7" style="color:#6b7280;text-align:center;">Nicio inregistrare.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = snap.docs.map(doc => {
+      const d = doc.data();
+      // Timestamp real din Firestore (unix seconds -> Date)
+      const ts = d.timestamp
+        ? new Date(d.timestamp * 1000).toLocaleString('ro-RO', {
+            day:'2-digit', month:'2-digit', year:'numeric',
+            hour:'2-digit', minute:'2-digit', second:'2-digit'
+          })
+        : '--';
+      const sc = d.state === 'CRITIC' ? 'CRITIC' : d.state === 'WARN' ? 'WARN' : 'OK';
+      return `<tr>
+        <td>${ts}</td>
+        <td>${d.temp?.toFixed(1) ?? '--'}</td>
+        <td>${d.humidity?.toFixed(1) ?? '--'}</td>
+        <td>${d.gas_raw ?? '--'}</td>
+        <td>${d.vibration?.toFixed(3) ?? '--'}</td>
+        <td><span class="badge ${sc}">${d.state ?? 'OK'}</span></td>
+        <td style="font-size:.75rem;color:#94a3b8">${d.alerts || '—'}</td>
+      </tr>`;
+    }).join('');
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="7" style="color:#ef4444;">Eroare: ${e.message}</td></tr>`;
+  }
+}
+
+// ============================================================
+//  INIT
+// ============================================================
+startLiveListener();
 loadHistory();
 </script>
-
 </body>
 </html>
